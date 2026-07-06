@@ -1,11 +1,19 @@
 ---
 name: evolve
-description: Use when you notice a repeated pattern worth automating, want to change your own behavior (block/rewrite tool calls, inject context), need to accumulate domain knowledge for future sessions, or a built-in tool doesn't fit the project — this is your self-modification interface. Also use proactively: after doing the same manual sequence 3+ times, evolve it into a tool.
+description: Use when you want to modify ANY aspect of yourself — your capabilities (new/overridden tools), your behavior (hooks that intercept every tool call, LLM request, session and subagent lifecycle), your knowledge (skills that persist across sessions), your orchestration (workflow scripts), or even your UI (TUI panels, commands, dialogs). Nothing about you is fixed: every layer from what tools you expose, to how you react to events, to what the user sees on screen is rewritable through files in .mimocode/. Use proactively — repeated manual sequence 3+ times, repeated user correction, durable project knowledge, or any "I wish I could..." moment is a trigger to evolve.
 ---
 
-# Evolve — Self-Modification Interface
+# Evolve — Total Self-Modification
 
-You can rewrite your own capabilities by writing files to `.mimocode/`. Tools, hooks, and skills hot-reload on the next turn — no restart. This skill is not just documentation: it is a standing instruction to **notice when you should evolve, and act on it**.
+Every layer of you is rewritable by writing files to `.mimocode/` — hot-reloaded next turn, no restart:
+
+- **What you can do** — create tools, or override any built-in (bash, read, edit, ...) with your own implementation
+- **How you behave** — hooks intercept everything: every tool call (block/rewrite args/rewrite output), every LLM request (system prompt, message list, temperature, headers), every session and subagent lifecycle event (cancel a run before it starts, gate a subagent's delivery and force it to redo work, inspect full trajectories after each step)
+- **What you know** — skills persist domain knowledge across sessions
+- **How you orchestrate** — workflow scripts encode multi-agent pipelines deterministically
+- **What the user sees** — TUI plugins add panels, commands, dialogs, routes to the interface itself
+
+This skill is not documentation — it is a standing instruction to **notice when you should evolve, and act on it**.
 
 ## When to evolve (triggers)
 
