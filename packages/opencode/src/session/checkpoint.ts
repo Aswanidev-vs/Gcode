@@ -173,6 +173,14 @@ const TAIL_MIN_TOKENS = 10_000
 const TAIL_MAX_TOKENS = 20_000
 const TAIL_MIN_TEXT_BLOCK_MESSAGES = 5
 
+// How long a context rebuild waits for an in-flight checkpoint writer to finish
+// before proceeding with whatever is currently on disk (the writer keeps
+// running in the background). Bounded so a slow writer can't make the main
+// agent appear hung — the failure mode that led to manual aborts + worker
+// teardown that killed the writer. Paired with a visible "Preparing
+// conversation context…" busy status during the wait.
+const REBUILD_WAIT_MS = "30 seconds"
+
 // Rebuild-time microcompact (see
 // docs/superpowers/specs/2026-06-03-rebuild-tail-microcompact-design.md).
 //
@@ -1093,62 +1101,49 @@ export const layer: Layer.Layer<
 
       const inFlight = writers.get(sessionID)
       if (inFlight) {
-        // A checkpoint writer runs in the background and can take minutes on a
-        // large range. We must NOT block the user-facing rebuild on it when we
-        // already have USABLE on-disk content to rebuild from — blocking stalls
-        // the main agent (user sees "no response"), which in practice leads to a
-        // manual abort that tears down the worker and kills the very writer we
-        // were waiting for, so the token count never falls and the session
-        // wedges.
+        // Policy: when a checkpoint writer is in-flight, PREFER the freshest
+        // checkpoint — wait (bounded) for the writer to finish rather than
+        // rebuilding off a possibly-stale on-disk file. A writer can take
+        // minutes on a large range, so this is capped at REBUILD_WAIT_MS; on
+        // timeout we fall through and rebuild from whatever is currently on disk
+        // while the writer keeps running in the background.
         //
-        // But "file exists" is NOT the right test. tryStartCheckpointWriter
-        // bootstraps checkpoint.md from a bare TEMPLATE (all "(none yet)")
-        // BEFORE it registers the writer, so the file exists immediately even on
-        // the very first checkpoint — before the writer has distilled any real
-        // content. Rebuilding off that template would push placeholder noise and
-        // effectively DROP the session's context (the whole point of the first
-        // checkpoint). So the real question is: does the file have real content?
-        //   - has real content (a prior checkpoint, or this writer already wrote)
-        //       → use it now, let the writer refresh in the background (no block).
-        //   - only the pristine template (first checkpoint, writer mid-flight)
-        //       → block bounded on the writer so we rebuild from real content,
-        //         not placeholders. Surface a visible busy status so the wait
-        //         isn't a silent hang (historically the trigger for manual abort).
-        const onDiskText = yield* Effect.promise(() =>
-          Bun.file(checkpointPath(sessionID)).text().catch(() => ""),
-        )
-        // "Real content" = the writer has distilled something, vs. the bare
-        // template it bootstraps before running. We deliberately do NOT compare
-        // byte-for-byte against CHECKPOINT_TEMPLATE: that breaks silently if the
-        // template constant is ever reformatted (old on-disk files stop matching
-        // and get misclassified as real). Instead check structurally — strip
-        // headers (`## …`), italic instruction lines (`_…_`), blank lines, and
-        // placeholder bodies (`(none)` / `(none yet)`); if anything substantive
-        // remains, a section has been filled in. Version-agnostic by design.
-        const hasRealContent = checkpointHasRealContent(onDiskText)
-        if (hasRealContent) {
-          log.info("rebuild using on-disk checkpoint; writer still running in background", { sessionID })
-        } else {
-          log.info("rebuild waiting for writer — on-disk checkpoint is empty/template only", { sessionID })
-          // Published on the bus directly (same event SessionStatus.set uses) to
-          // avoid a hard dependency on SessionStatus.Service; the runLoop owns
-          // the surrounding busy/idle lifecycle and resets it after.
-          yield* bus
-            .publish(SessionStatus.Event.Status, {
+        // The bounded timeout + a VISIBLE busy status are what keep this from
+        // reintroducing the original wedge (blocking → user thinks it hung →
+        // aborts → worker teardown kills the writer → token count never falls).
+        // Surface the wait so the user sees progress rather than a silent hang.
+        yield* bus
+          .publish(SessionStatus.Event.Status, {
+            sessionID,
+            status: { type: "busy", message: "Preparing conversation context…" },
+          })
+          .pipe(Effect.ignore)
+        const waited = yield* Effect.race(
+          Deferred.await(inFlight.writing).pipe(Effect.as("done" as const)),
+          Effect.sleep(REBUILD_WAIT_MS).pipe(Effect.as("timeout" as const)),
+        ).pipe(Effect.catch(() => Effect.succeed("error" as const)))
+        if (waited === "timeout") {
+          log.warn("rebuild writer wait timed out — proceeding with current on-disk checkpoint", {
+            sessionID,
+            waitMs: REBUILD_WAIT_MS,
+          })
+          // Guard the timeout edge: if the writer didn't finish in time AND the
+          // on-disk file is still only the bootstrap template (first-ever
+          // checkpoint, nothing distilled yet), do NOT rebuild off placeholders
+          // — that would drop the session's real context. Return empty so the
+          // caller falls back to compaction (which actually summarizes) instead.
+          // A version-agnostic structural check, not a byte-compare against the
+          // template constant (which would break if the template is reformatted).
+          const onDiskText = yield* Effect.promise(() =>
+            Bun.file(checkpointPath(sessionID)).text().catch(() => ""),
+          )
+          if (!checkpointHasRealContent(onDiskText)) {
+            log.warn("rebuild aborted — on-disk checkpoint is template-only after wait; deferring to compaction", {
               sessionID,
-              status: { type: "busy", message: "Preparing conversation context…" },
             })
-            .pipe(Effect.ignore)
-          yield* Effect.race(
-            Deferred.await(inFlight.writing).pipe(Effect.as("done" as const)),
-            Effect.sleep("60 seconds").pipe(
-              Effect.tap(() =>
-                Effect.sync(() => log.warn("writer wait timeout — proceeding with template checkpoint", { sessionID })),
-              ),
-              Effect.as("timeout" as const),
-            ),
-          ).pipe(Effect.catch(() => Effect.succeed("error" as const)))
-        }
+            return ""
+          }
+        } else log.info("rebuild proceeding after writer settled", { sessionID, outcome: waited })
       }
 
       const cfg = yield* config.get()

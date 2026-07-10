@@ -113,53 +113,47 @@ function seedSessionWithWriter() {
   })
 }
 
-describe("renderRebuildContext: non-blocking on real content, blocks only on template-only", () => {
+describe("renderRebuildContext: waits (bounded) for an in-flight writer, then degrades", () => {
   it.live(
-    "on-disk checkpoint present + writer in-flight → returns promptly using the file",
+    "writer in-flight (real on-disk checkpoint) → waits for the writer rather than using the stale file immediately",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const svc = yield* SessionCheckpoint.Service
         const info = yield* seedSessionWithWriter()
 
-        // Writer is hanging (in-flight). Now put a checkpoint.md on disk.
+        // Real (non-template) checkpoint already on disk.
         const marker = "MARKER_ONDISK_CHECKPOINT_BODY"
         yield* Effect.promise(() =>
           fs.writeFile(checkpointPath(info.id), `# Session checkpoint\n\n## §1 Active intent\n${marker}\n`),
         )
 
-        // Pre-fix this call would block up to 60s on the Effect.race waiting for
-        // the (never-resolving) writer. Assert it returns fast AND surfaces the
-        // on-disk body — i.e. it used the file instead of waiting.
-        const started = Date.now()
-        const ctx = yield* svc.renderRebuildContext(info.id, { agentID: "main" })
-        const elapsedMs = Date.now() - started
-
-        expect(elapsedMs).toBeLessThan(5_000) // nowhere near the 60s block
-        expect(ctx).toContain(marker)
+        // Policy: prefer the freshest checkpoint — wait (bounded, REBUILD_WAIT_MS)
+        // for the in-flight writer instead of using the possibly-stale file
+        // immediately. The writer here hangs forever, so within a short
+        // observation window the call must STILL be waiting (None), proving it
+        // blocks on the writer rather than returning the stale on-disk body fast.
+        const result = yield* svc
+          .renderRebuildContext(info.id, { agentID: "main" })
+          .pipe(Effect.timeout("2 seconds"), Effect.option)
+        expect(result._tag).toBe("None")
       }),
     ),
   )
 
   it.live(
-    "on-disk file is only the bare template + writer in-flight → blocks (won't rebuild from placeholders)",
+    "writer in-flight (template-only on disk) → also waits (won't rebuild from placeholders)",
     provideTmpdirInstance(() =>
       Effect.gen(function* () {
         const svc = yield* SessionCheckpoint.Service
         const info = yield* seedSessionWithWriter()
 
-        // tryStartCheckpointWriter bootstraps checkpoint.md from the bare
-        // template (all "(none yet)") before the writer produces real content.
-        // The file therefore EXISTS but carries no distilled context yet.
-        // Rebuilding from it would push placeholder noise and drop the session's
-        // real context — so the fix must NOT take the fast path here; it must
-        // wait (bounded) for the writer to write real content.
+        // tryStartCheckpointWriter bootstrapped checkpoint.md from the bare
+        // template; the file exists but has no distilled content. The wait
+        // policy applies here too — bounded observation must show it still
+        // waiting on the hanging writer, not returning a placeholder rebuild.
         const onDisk = yield* svc.hasCheckpoint(info.id)
-        expect(onDisk).toBe(true) // file exists...
+        expect(onDisk).toBe(true)
 
-        // ...but because it's template-only, renderRebuildContext blocks on the
-        // (hanging) writer. Bound the observation to 2s and assert it is STILL
-        // waiting (None) rather than having returned a placeholder rebuild. This
-        // is the regression guard for the "template ≠ usable content" bug.
         const result = yield* svc
           .renderRebuildContext(info.id, { agentID: "main" })
           .pipe(Effect.timeout("2 seconds"), Effect.option)
