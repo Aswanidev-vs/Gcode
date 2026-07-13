@@ -42,10 +42,19 @@ export interface DrainSeed {
  * Resolve the {agent, model} a drained synthetic user message should carry,
  * via a layered cheapest-first fallback. Exported for unit testing.
  *
- *  1. A prior real (non-system) model-bearing message anywhere in the session
- *     (cross-slice `findMessage`, agentID "*"). Inherits that message's
- *     agent+model. No Provider dependency — covers the common idle-standing-peer
- *     case (a peer ran a turn, then went idle).
+ *  1. A prior real (non-system) model-bearing message. Inherits that message's
+ *     agent+model. No Provider dependency. The SEARCH SCOPE depends on the
+ *     receiver's mode: a standing `peer` (its actor id === its session id, runs
+ *     its own child session) may have run a turn under a DIFFERENT slice then
+ *     gone idle, so it searches cross-slice (agentID "*") — the idle-standing-
+ *     peer relay case. Every other receiver (an ordinary subagent slice, or a
+ *     session's host/"main" actor that merely COORDINATES other actors — e.g. a
+ *     WorkflowRuntime parent whose subagents run under its session) searches
+ *     ONLY its own slice, so a completion/notification delivered to the host
+ *     never fabricates a turn off an unrelated subagent's message. Restoring the
+ *     pre-relay slice scope for non-peers fixes the WorkflowRuntime regression
+ *     where the parent "main" drained a child's actor_notification into a real
+ *     LLM turn (stealing a queued response from the next agent()).
  *  2. A true turnCount-0 / empty-slice peer: agent from the actor-registry row
  *     (recorded at spawn), model from the project default resolver reachable via
  *     `defaultModelRef` (an already-wired value — no fresh provider layer). If
@@ -59,7 +68,11 @@ export function resolveDrainSeed(
   actorID: string,
 ): Effect.Effect<DrainSeed | undefined> {
   return Effect.gen(function* () {
-    // Tier 1: any prior real model-bearing message across the whole session.
+    // Receiver's registry row decides the Tier 1 search scope + feeds Tier 2.
+    const actor = yield* reg.get(sessionID, actorID)
+    // Tier 1: a prior real model-bearing message. Cross-slice ONLY for a standing
+    // peer; slice-scoped for every other receiver (subagent / coordinating host).
+    const crossSlice = actor?.mode === "peer"
     const match = yield* sessions.findMessage(
       sessionID,
       (m) =>
@@ -69,7 +82,7 @@ export function resolveDrainSeed(
         m.info.model.providerID !== "system" &&
         "agent" in m.info &&
         m.info.agent !== "system",
-      { agentID: "*" },
+      { agentID: crossSlice ? "*" : actorID },
     )
     if (Option.isSome(match)) {
       const info = match.value.info
@@ -80,7 +93,6 @@ export function resolveDrainSeed(
 
     // Tier 2: turnCount-0 / empty slice. Agent from the registry row (recorded
     // at spawn); model from the already-wired default resolver.
-    const actor = yield* reg.get(sessionID, actorID)
     const resolver = defaultModelRef.current
     if (actor && resolver) {
       const model = yield* resolver.defaultModel()
