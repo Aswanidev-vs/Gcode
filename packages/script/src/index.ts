@@ -43,7 +43,9 @@ const SHORT_SHA = await (async () => {
 const VERSION = await (async () => {
   if (env.MIMOCODE_VERSION) return env.MIMOCODE_VERSION
   if (IS_PREVIEW) {
-    return SHORT_SHA ? `0.0.0-${CHANNEL}-${SHORT_SHA}` : `0.0.0-${CHANNEL}`
+    if (SHORT_SHA) return `0.0.0-${CHANNEL}-${SHORT_SHA}`
+    const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12)
+    return `0.0.0-${CHANNEL}-${ts}`
   }
   const version = await Bun.file(path.resolve(import.meta.dir, "../../opencode/package.json"))
     .json()
