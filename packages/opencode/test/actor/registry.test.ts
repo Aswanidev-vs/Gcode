@@ -510,13 +510,6 @@ describe("ActorRegistry", () => {
 
     test("same-process layer rebuild does NOT orphan running children (singleton instanceID)", async () => {
       await using tmp = await tmpdir({ git: true })
-      const parent = await Instance.provide({
-        directory: tmp.path,
-        fn: async () => {
-          const svc = await Instance.provide({ directory: tmp.path, fn: async () => null }).then(() => null)
-          return null
-        },
-      })
       // Use Instance.provide to share the same directory across multiple layer constructions
       await Instance.provide({
         directory: tmp.path,

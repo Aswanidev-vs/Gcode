@@ -8,6 +8,7 @@ import { deriveLiveness } from "./schema"
 import * as Events from "./events"
 import { Log } from "@/util"
 import { SYSTEM_SPAWNED_AGENT_TYPES } from "@/agent/config"
+import { randomUUID } from "node:crypto"
 
 const log = Log.create({ service: "actor.registry" })
 
@@ -15,10 +16,10 @@ const STUCK_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
 const SCAN_INTERVAL_MS = 60 * 1000 // every 60s
 
 // Process-level singleton instance ID for orphan recovery.
-// Derived from process.pid + process start timestamp so it is stable
-// across layer rebuilds within the same process. A genuine new process
-// (different pid) gets a different ID and correctly reclaims dead rows.
-const PROCESS_INSTANCE_ID = `${process.pid}-${process.hrtime.bigint()}`
+// A unique token generated once at module load. Stable across layer rebuilds
+// within the same process; a fresh process gets a new token and correctly
+// reclaims dead rows.
+const PROCESS_INSTANCE_ID = randomUUID()
 
 type ActorRow = typeof ActorRegistryTable.$inferSelect
 
