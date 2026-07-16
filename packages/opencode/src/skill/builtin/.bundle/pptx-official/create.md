@@ -113,13 +113,22 @@ from pptx.oxml.ns import qn
 
 def set_cjk_font(run, font_name):
     """Set Latin (a:latin), East-Asian (a:ea) and complex-script (a:cs) typefaces."""
-    run.font.name = font_name                      # a:latin
+    run.font.name = font_name                      # a:latin (python-pptx inserts it in order)
     rPr = run._r.get_or_add_rPr()
+    # a:ea / a:cs aren't exposed by python-pptx, so build them by hand. But a:rPr
+    # enforces child order (a:latin, a:ea, a:cs, a:sym, a:hlinkClick, ...); a bare
+    # append() lands after any existing a:hlinkClick/a:sym/etc. and yields invalid
+    # markup that PowerPoint "repairs" by dropping the font. Insert before the first
+    # legal successor instead (a:ea must also precede a:cs).
+    successors = {
+        "a:ea": ("a:cs", "a:sym", "a:hlinkClick", "a:hlinkMouseOver", "a:rtl", "a:extLst"),
+        "a:cs": ("a:sym", "a:hlinkClick", "a:hlinkMouseOver", "a:rtl", "a:extLst"),
+    }
     for tag in ("a:ea", "a:cs"):
         el = rPr.find(qn(tag))
         if el is None:
             el = rPr.makeelement(qn(tag), {})
-            rPr.append(el)
+            rPr.insert_element_before(el, *successors[tag])
         el.set("typeface", font_name)
 
 set_cjk_font(p.runs[0], "Noto Sans CJK SC")        # a CJK-capable font present on the render machine
