@@ -31,14 +31,20 @@ export function assertAgentWriteSandbox(input: {
 }): void {
   if (!WRITE_SANDBOXED_AGENTS.has(input.agentName)) return
 
-  const underMemory = pathContains(input.memoryRoot, input.target)
-  const dotDir = path.join(input.worktree, ".mimocode")
-  const underDotDir = pathContains(dotDir, input.target)
-  if (underMemory || underDotDir) return
+  // Resolve here rather than trusting the caller: write.ts/edit.ts pass an
+  // absolute file_path THROUGH unnormalized, so a target like
+  // `<worktree>/.mimocode/../src/x.ts` would string-prefix-match `.mimocode`
+  // yet land in src/. path.resolve folds `..` before comparison, closing that
+  // escape. (apply_patch already resolves; this makes the guard robust for all
+  // callers.) The roots are resolved too so the comparison is apples-to-apples.
+  const target = path.resolve(input.target)
+  const memoryRoot = path.resolve(input.memoryRoot)
+  const dotDir = path.resolve(input.worktree, ".mimocode")
+  if (pathContains(memoryRoot, target) || pathContains(dotDir, target)) return
 
   throw new Error(
     `Agent '${input.agentName}' may only write under the memory tree or ${dotDir}.\n` +
-      `  memory: ${input.memoryRoot}\n` +
+      `  memory: ${memoryRoot}\n` +
       `  config: ${dotDir}\n` +
       `You attempted: ${input.target}.`,
   )

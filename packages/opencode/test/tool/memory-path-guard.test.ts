@@ -652,6 +652,39 @@ describe("assertAgentWriteSandbox", () => {
       ).toThrow(/may only write/)
     })
 
+    test(`${agent} may NOT escape .mimocode via .. into a source file`, () => {
+      expect(() =>
+        assertAgentWriteSandbox({
+          target: path.join(WORKTREE, ".mimocode", "..", "src", "index.ts"),
+          agentName: agent,
+          memoryRoot: MEMORY_ROOT,
+          worktree: WORKTREE,
+        }),
+      ).toThrow(/may only write/)
+    })
+
+    test(`${agent} may NOT escape the memory tree via ..`, () => {
+      expect(() =>
+        assertAgentWriteSandbox({
+          target: path.join(MEMORY_ROOT, "..", "secret.txt"),
+          agentName: agent,
+          memoryRoot: MEMORY_ROOT,
+          worktree: WORKTREE,
+        }),
+      ).toThrow(/may only write/)
+    })
+
+    test(`${agent} unnormalized-but-in-bounds path still passes`, () => {
+      expect(() =>
+        assertAgentWriteSandbox({
+          target: path.join(WORKTREE, ".mimocode", "skills", "..", "agent", "x.md"),
+          agentName: agent,
+          memoryRoot: MEMORY_ROOT,
+          worktree: WORKTREE,
+        }),
+      ).not.toThrow()
+    })
+
     test(`${agent} sibling of memory root does not match by prefix`, () => {
       expect(() =>
         assertAgentWriteSandbox({
