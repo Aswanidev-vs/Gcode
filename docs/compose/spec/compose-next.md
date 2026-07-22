@@ -1,8 +1,9 @@
 ---
 feature: compose-next
-status: in-progress
+status: delivered
 updated: 2026-07-22
 branch: compose-next
+commits: 8e2817cfddb35ba19fcea221b6567966890dfc87..42613223d00eec340651b632aacfcac01677f795
 predecessor: compose-slim (draft PR #1850)
 ---
 
@@ -10,11 +11,17 @@ predecessor: compose-slim (draft PR #1850)
 
 ## Report
 
-**What this ships** - One self-contained builtin skill named `compose-next`, invoked from Build as `/compose-next`. It bundles the compact compose workflow (spec, worktrees, dependency-ordered implementation, verification, review, feature-document finalize, finish) into a single skill load. Legacy Compose keeps working unchanged and is marked deprecated.
+**What was built** - One self-contained builtin skill `compose-next` (grill → spec → workspace → implement → verify → review → finalize → finish), invoked from Build as `/compose-next`. Hidden from model auto-discovery via an exact `"compose-next": "deny"` default-agent skill permission plus `skill_search` sourcing from `Skill.available(agent)`; still present in `Skill.all()` so slash autocomplete works. Legacy Compose is untouched functionally and marked deprecated through three additive touchpoints: agent description line, `Compose (legacy)` input-bar label, and a compose-only home-tip display override. Side fix: tips now render for first-time users (first-session gate removed).
 
-**Compatibility posture** - Legacy Compose (`compose` agent, `compose:*` private skills, `compose.txt` prompt, existing `compose.js` workflow) remains functional. `compose-next` is additive. No workflow rewrite, no `compose:` skill deletion, no `compose.txt` change, no plan-mode change, no permission-preset change. Removal of Legacy Compose is a later, separate PR gated on release observation of the dual path.
+**Verification** - From `packages/opencode`: `bun test test/skill test/permission test/tool/skill-search.test.ts` — 230 pass / 0 fail / 555 assertions. `bun typecheck` — PASS. `git diff --check` — PASS. CI (lint, typecheck, unit shards 1-4) — all green on PR #1861.
 
-**Explicit non-goals for this PR** - Do not introduce structured `Skill.Info.scope`, `Permission.evaluateSkill`, or `ScanMeta` scanning. The `compose:*` name-prefix heuristic that already exists on `main` at six sites is left in place; it will disappear alongside Legacy Compose in the same removal PR, at which point no general scope mechanism is required either. Keeping the scope refactor out of this PR is the whole reason `compose-next` fits as a small, additive compatibility step.
+**Journey log**
+
+1. CI shard 4 failed from cross-file env pollution: `skill.test.ts` sets `MIMOCODE_DISABLE_BUILTIN_SKILLS` at module top-level and never restores; the Flag getter reads env lazily. Fixed with the save/clear/restore pattern from #1850's `available-permission.test.ts`. Lesson: any test needing builtin-bundle extraction must defensively clear that flag.
+2. The skill originally referenced `<compose_docs_dir>` — a prompt block only injected for the Compose agent and `compose.js`, never in Build sessions. Dead reference removed; path hardcoded to `docs/compose/spec/`. Lesson: a skill assembled from another agent's bundle inherits that agent's prompt-injection assumptions; audit them.
+3. Workspace was dropped from the pipeline declaration during the three-skill hand-merge, letting the mechanical-change branch land on `main` by omission. Merge artifacts hide in transition sentences, not section bodies.
+4. Review-loop needed a stop gate but a hardcoded round count was rejected in favor of judgment-based non-convergence signals (repeated findings on the same area; fixes introducing new criticals).
+5. The finalize commit necessarily sits outside the recorded reviewed range; without saying so, a literal reader loops finalize → re-review → finalize. The skill now states CI re-running on it is expected.
 
 ## [S1] Problem
 
@@ -187,12 +194,12 @@ Draft PR opens in Ready state (not Draft) since this is the successor implementa
 
 ## Tasks
 
-- [ ] T1: author `packages/opencode/src/skill/builtin/.bundle/compose-next/SKILL.md` by hand-merging compact contracts from `origin/compose-slim` three slim skills — acceptance: skill validator reports 0 errors, 0 warnings; single-file self-contained load; executable contracts for grill / spec / worktree / verify / review / finalize / finish present (covers: S2)
-- [ ] T2: add exact `"compose-next": "deny"` to default agent skill permission — acceptance: `Skill.available(defaultAgent)` omits `compose-next`; `Skill.all()` includes it; test asserts both (covers: S2, S3)
-- [ ] T3: switch `tool/skill-search.ts` to `Skill.available(agent)` — acceptance: search over a query matching `compose-next` under the default agent returns no result; existing search tests remain green (covers: S2, S3)
-- [ ] T4: append deprecation line to Compose agent `description` in `agent.ts` — acceptance: single-line addition; Compose agent behavior otherwise unchanged; `compose.txt` untouched (prefix-cache stability); existing Compose tests green (covers: S2)
-- [ ] T5: surface `tui.tips.compose_next` as a compose-only display override in `tips-view.tsx` (leave rotation identical to main; excluded from `TIP_KEYS`/`PRIORITY_WEIGHTS`; a `displayKey` memo overrides while agent is `compose`); remove the first-session gate in `tips.tsx` so tips also render on a fresh project; add key to all seven locale files — acceptance: rendered tip is compose_next iff current agent is `compose`; non-compose agent switches do not trigger tip changes; leaving compose reveals the rotation's current key; on a fresh project the tips row renders; all seven locales carry the key (covers: S2)
-- [ ] T6: show `Compose (legacy)` in the input-bar agent label when the current agent is `compose` — acceptance: agent identity, routing, and Tab-cycle unchanged; only the rendered label carries the suffix; label for `build`/`plan` unchanged (covers: S2)
-- [ ] T7: add `tui.skill.compose-next.description` to all seven locales — acceptance: skill dialog / autocomplete render the localized description (covers: S2)
-- [ ] T8: verification band pass — acceptance: relevant `bun test` bands and `bun typecheck` and `git diff --check` all pass from `packages/opencode` (covers: S3)
-- [ ] T9: open the PR (Ready, not Draft); update PR #1850 body with its URL and close #1850 as superseded — acceptance: successor URL recorded on #1850; closure message frames the experiment as graduated (covers: S4)
+- [x] T1: author `packages/opencode/src/skill/builtin/.bundle/compose-next/SKILL.md` by hand-merging compact contracts from `origin/compose-slim` three slim skills — acceptance: skill validator reports 0 errors, 0 warnings; single-file self-contained load; executable contracts for grill / spec / worktree / verify / review / finalize / finish present (covers: S2)
+- [x] T2: add exact `"compose-next": "deny"` to default agent skill permission — acceptance: `Skill.available(defaultAgent)` omits `compose-next`; `Skill.all()` includes it; test asserts both (covers: S2, S3)
+- [x] T3: switch `tool/skill-search.ts` to `Skill.available(agent)` — acceptance: search over a query matching `compose-next` under the default agent returns no result; existing search tests remain green (covers: S2, S3)
+- [x] T4: append deprecation line to Compose agent `description` in `agent.ts` — acceptance: single-line addition; Compose agent behavior otherwise unchanged; `compose.txt` untouched (prefix-cache stability); existing Compose tests green (covers: S2)
+- [x] T5: surface `tui.tips.compose_next` as a compose-only display override in `tips-view.tsx` (leave rotation identical to main; excluded from `TIP_KEYS`/`PRIORITY_WEIGHTS`; a `displayKey` memo overrides while agent is `compose`); remove the first-session gate in `tips.tsx` so tips also render on a fresh project; add key to all seven locale files — acceptance: rendered tip is compose_next iff current agent is `compose`; non-compose agent switches do not trigger tip changes; leaving compose reveals the rotation's current key; on a fresh project the tips row renders; all seven locales carry the key (covers: S2)
+- [x] T6: show `Compose (legacy)` in the input-bar agent label when the current agent is `compose` — acceptance: agent identity, routing, and Tab-cycle unchanged; only the rendered label carries the suffix; label for `build`/`plan` unchanged (covers: S2)
+- [x] T7: add `tui.skill.compose-next.description` to all seven locales — acceptance: skill dialog / autocomplete render the localized description (covers: S2)
+- [x] T8: verification band pass — acceptance: relevant `bun test` bands and `bun typecheck` and `git diff --check` all pass from `packages/opencode` (covers: S3)
+- [x] T9: open the PR (Ready, not Draft); update PR #1850 body with its URL and close #1850 as superseded — acceptance: successor URL recorded on #1850; closure message frames the experiment as graduated (covers: S4)
