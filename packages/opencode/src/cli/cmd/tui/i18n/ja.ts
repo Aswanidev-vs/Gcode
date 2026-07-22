@@ -61,7 +61,7 @@ export const dict = {
     "1 つのメッセージ内で複数の {highlight}/skill-name{/highlight} を組み合わせて、複数の Skill を同時に使えます",
   "tui.tips.background": "{highlight}/background{/highlight} を実行してホーム背景にお好みの画像を設定できます",
   "tui.tips.compose_next":
-    "{highlight}/compose-next{/highlight} は強力なモデル向け、Compose エージェントの代わりに推奨",
+    "{highlight}/compose-next{/highlight} を推奨（強力なモデル向け・Compose 代替）",
   "tui.tips.undo": "{highlight}/undo{/highlight} で直前のメッセージとファイル変更を取り消します",
   "tui.tips.redo": "{highlight}/redo{/highlight} で取り消したメッセージとファイル変更を復元します",
   "tui.tips.drag_drop": "画像や PDF をターミナルにドラッグ＆ドロップしてコンテキストに追加できます",
