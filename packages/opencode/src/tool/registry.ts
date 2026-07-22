@@ -3,6 +3,7 @@ import { Session } from "../session"
 import { QuestionTool } from "./question"
 import { BashTool, bashDescription } from "./bash"
 import { EditTool } from "./edit"
+import { MultiEditTool } from "./multiedit"
 import { GlobTool } from "./glob"
 import { GrepTool } from "./grep"
 import { HistoryTool } from "./history"
@@ -383,8 +384,11 @@ export const layer = Layer.effect(
         if (tool.id === ApplyPatchTool.id || tool.id === ViewImageTool.id) return useGPTTools
         if (
           tool.id === EditTool.id ||
+          tool.id === MultiEditTool.id ||
           tool.id === WriteTool.id ||
           tool.id === ReadTool.id ||
+          tool.id === GrepTool.id ||
+          tool.id === GlobTool.id ||
           tool.id === NotebookEditTool.id
         )
           return !useGPTTools

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect } from "bun:test"
+import fs from "fs/promises"
+import path from "path"
 import { Effect, Layer } from "effect"
 import { ToolRegistry } from "../../src/tool"
 import { Agent } from "../../src/agent/agent"
@@ -57,6 +59,8 @@ describe("ToolRegistry.tools: invocation style resolution", () => {
         expect(bash?.description).toContain("Use `apply_patch`")
         expect(bash?.description).not.toContain("DO NOT use it for file operations")
         expect(tools.some((tool) => tool.id === "notebook_edit")).toBeFalse()
+        expect(tools.some((tool) => tool.id === "grep")).toBeFalse()
+        expect(tools.some((tool) => tool.id === "glob")).toBeFalse()
       }),
     ),
   )
@@ -77,8 +81,46 @@ describe("ToolRegistry.tools: invocation style resolution", () => {
         expect(bash?.description).toContain("DO NOT use it for file operations")
         expect(bash?.description).not.toContain("the dedicated `read`, `write`, and `edit` tools are unavailable")
         expect(tools.some((tool) => tool.id === "notebook_edit")).toBeTrue()
+        expect(tools.some((tool) => tool.id === "grep")).toBeTrue()
+        expect(tools.some((tool) => tool.id === "glob")).toBeTrue()
       }),
     ),
+  )
+
+  it.live("masks multiedit for GPT models", () =>
+    provideTmpdirInstance((dir) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => fs.mkdir(path.join(dir, ".mimocode/tool"), { recursive: true }))
+        yield* Effect.promise(() =>
+          Bun.write(
+            path.join(dir, ".mimocode/tool/multiedit.ts"),
+            [
+              "export default {",
+              "  description: 'multi-edit files',",
+              "  args: {},",
+              "  execute: async () => 'done',",
+              "}",
+            ].join("\n"),
+          ),
+        )
+        const reg = yield* ToolRegistry.Service
+        const agents = yield* Agent.Service
+        const general = yield* agents.get("general")
+        if (!general) throw new Error("no general agent")
+        const ids = (modelID: string) =>
+          reg
+            .tools({
+              providerID: ProviderID.opencode,
+              modelID: ModelID.make(modelID),
+              agent: general,
+            })
+            .pipe(Effect.map((tools) => tools.map((tool) => tool.id)))
+
+        expect(yield* ids("openai/gpt-5.4")).not.toContain("multiedit")
+        expect(yield* ids("anthropic/claude-sonnet-4-6")).toContain("multiedit")
+      }),
+    ),
+    10000,
   )
 
   it.live("default config keeps task in JSON mode", () =>
