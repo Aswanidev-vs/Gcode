@@ -89,6 +89,8 @@ sudo apt install xsel
 
 按 `Tab` 在主智能体间切换。子智能体由系统按需生成。
 
+对于前沿模型（Fable/Sol 级），推荐用 **build** agent 配合 `/compose-next` 技能来完成 compose 类工作——见 [Compose 编排模式](#compose-编排模式)。
+
 ### 持久化记忆
 
 基于 SQLite FTS5 全文搜索的跨会话记忆：
@@ -120,7 +122,11 @@ sudo apt install xsel
 
 ### Compose 编排模式
 
-Compose 模式提供结构化的 specs-driven 开发流程，内置规划、执行、代码审查、TDD、调试、验证、合并等技能——编排从 spec 到交付的完整开发生命周期。
+Compose 是 MiMoCode 的 specs-driven 结构化开发流程，编排从 spec 到交付的完整开发生命周期。
+
+推荐用法是在 **build** agent 中使用 **`/compose-next`** 技能：一份独立完整的契约，覆盖 grill → spec → workspace → implement → verify → review → finalize → finish，功能文档落在 `docs/compose/spec/<feature>.md`。它面向前沿模型（Fable/Sol 级）设计——这类模型已内化大部分流程，用一份紧凑契约效果最好。
+
+Legacy 路径是专用的 **compose agent**（按 `Tab` 切换），它编排规划、执行、代码审查、TDD、调试、验证、合并等十四个内置技能——这套分步技能课程对较弱模型依然适用。
 
 ### Workflows
 
@@ -135,7 +141,7 @@ MiMoCode 内置四个 Workflow：
 | `fact-check` | Plan → Search → Extract → Group → Crosscheck → Report | 对抗式事实验证。并行搜索网络、提取可验证事实、分组去重、用 3 人陪审投票交叉验证，只保留通过的结论。适合精确求证（"X 是否属实？"）。 |
 | `research-experiment` | Baseline → Loop → Audit → Report | 面向可机械验证指标的自主优化循环。建立基线后反复执行“提出假设 → 实现 → 评估 → 保留/回滚”，审计指标作弊风险，并生成可复现的结果日志。需要固定预算的评估命令和明确的可编辑文件范围。 |
 
-compose workflow 与 compose agent 互补：**workflow** 适合需求清晰、任务可独立拆解的场景（确定性、并行、非交互）；**agent** 适合需要中途改方向或在步骤间注入人工判断的场景（对话式、交互式）。
+compose workflow 与交互式路径互补：**workflow** 适合需求清晰、任务可独立拆解的场景（确定性、并行、非交互）；**build** agent 配合 `/compose-next`（或 legacy 的 compose agent）适合需要中途改方向或在步骤间注入人工判断的场景（对话式、交互式）。
 
 **自定义 Workflow：** 在 `.mimocode/workflows/` 或 `.claude/workflows/` 下放置 `.js` 文件即可定义自己的 Workflow，也可用同名文件覆盖内置 Workflow（如 `.mimocode/workflows/compose.js`）。
 
@@ -150,6 +156,7 @@ MiMoCode 打包了以下内置技能：
 | `arxiv` | 搜索、阅读、引用和分析 arXiv 论文 |
 | `claude-code` | 将编码、测试、审查和 Git 任务委派给 Claude Code CLI |
 | `codex` | 在无头自动化、CI、容器和远程环境中运行及排查 Codex CLI |
+| `compose-next` | 推荐的 spec→ship 功能交付工作流（grill → spec → implement → verify → review → finish）；通过 `/compose-next` 显式调用 |
 | `data-analytics` | 通过数据质量、KPI、仪表盘、报告、Notebook 和市场规模测算等工作流分析产品与业务数据 |
 | `deep-research` | 使用并行子智能体和内置 Web 工具生成带引用的多源深度调研报告 |
 | `design-blueprint` | 动手做视觉前先出设计蓝图（DESIGN.md + 决策轨迹）|

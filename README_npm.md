@@ -47,7 +47,7 @@ The first launch guides you through configuration automatically. Supported optio
 - **Task Tracking** — tree-shaped task system integrated with the checkpoint system
 - **Subagent System** — parallel subagents with lifecycle tracking, cancellation, and background execution
 - **Goal / Stop Condition** — judge model prevents premature stops during autonomous work
-- **Compose Mode** — structured workflow for specs-driven development with built-in skills
+- **Compose Mode** — structured workflow for specs-driven development; recommended via the `/compose-next` skill on the build agent
 - **Voice Input** — real-time streaming voice input powered by TenVAD and MiMo ASR
 - **Dream & Distill** — extract knowledge into memory (`/dream`) and discover reusable workflows (`/distill`)
 

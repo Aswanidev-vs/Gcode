@@ -92,6 +92,8 @@ Beyond MiMoCode, Xiaomi MiMo models also work in other agents and coding tools l
 
 Press `Tab` to switch between primary agents. Subagents are created by the system as needed.
 
+For frontier models (Fable/Sol-class), the recommended way to run compose-style work is the **build** agent with the `/compose-next` skill — see [Compose Mode](#compose-mode).
+
 ### Persistent Memory
 
 Cross-session memory powered by SQLite FTS5 full-text search:
@@ -123,7 +125,11 @@ The `/goal` command sets a stopping condition for a session. When the agent trie
 
 ### Compose Mode
 
-Compose mode provides a structured workflow for specs-driven development. It includes built-in skills for planning, execution, code review, TDD, debugging, verification, and merging — orchestrating the full lifecycle from spec to shipped code.
+Compose is MiMoCode's structured workflow for specs-driven development, orchestrating the full lifecycle from spec to shipped code.
+
+The recommended way to use it is the **`/compose-next`** skill on the **build** agent: a single self-contained contract covering grill → spec → workspace → implement → verify → review → finalize → finish, with feature documents at `docs/compose/spec/<feature>.md`. It is designed for frontier models (Fable/Sol-class), which internalize most of the workflow and work best from one compact contract.
+
+The legacy path is the dedicated **compose agent** (switch with `Tab`), which orchestrates fourteen built-in skills for planning, execution, code review, TDD, debugging, verification, and merging — a step-by-step curriculum that remains useful for weaker models.
 
 ### Workflows
 
@@ -138,7 +144,7 @@ MiMoCode ships with four built-in workflows:
 | `fact-check` | Plan → Search → Extract → Group → Crosscheck → Report | Adversarial fact verification. Runs parallel web searches, extracts checkable facts, groups duplicates, then cross-checks each with a 3-juror adversarial vote. Best for precise claims ("Is X true?"). |
 | `research-experiment` | Baseline → Loop → Audit → Report | Autonomous optimization loop for a mechanically verifiable metric. Establishes a baseline, iterates through hypothesize → implement → evaluate → keep/revert, audits for metric gaming, and produces a reproducible result log. Requires a fixed-budget evaluation command and an explicit editable-file scope. |
 
-The compose workflow complements the compose agent: use the **workflow** when requirements are clear and tasks split cleanly (deterministic, parallel, non-interactive); use the **agent** when you need to redirect mid-flow or inject judgment between steps (conversational, interactive).
+The compose workflow complements the interactive path: use the **workflow** when requirements are clear and tasks split cleanly (deterministic, parallel, non-interactive); use the **build** agent with `/compose-next` (or the legacy compose agent) when you need to redirect mid-flow or inject judgment between steps (conversational, interactive).
 
 **Custom workflows:** Place a `.js` file in `.mimocode/workflows/` or `.claude/workflows/` to define your own, or override a built-in by using the same name (e.g. `.mimocode/workflows/compose.js`).
 
@@ -153,6 +159,7 @@ MiMoCode bundles the following builtin skills:
 | `arxiv` | Search, read, cite, and analyze arXiv papers |
 | `claude-code` | Delegate coding, testing, review, and Git tasks to the Claude Code CLI |
 | `codex` | Run and troubleshoot the Codex CLI in headless automation, CI, containers, and remote environments |
+| `compose-next` | Recommended spec→ship feature delivery workflow (grill → spec → implement → verify → review → finish); invoke explicitly with `/compose-next` |
 | `data-analytics` | Analyze product and business data through reusable workflows for data quality, KPIs, dashboards, reports, notebooks, and market sizing |
 | `deep-research` | Produce cited, multi-source research reports with parallel subagents and built-in web tools |
 | `design-blueprint` | Produce a design blueprint (DESIGN.md + Decision Trace) before mocking up visuals |

@@ -43,6 +43,7 @@ Notable TUI flags: `--continue`/`-c` (resume last session), `--session`/`-s`, `-
 | `/loops` | List scheduled cron/loop jobs; `/loops cancel <id>` stops one |
 | `/rebuild` | Rebuild the conversation context now from the latest checkpoint — frees context on demand instead of waiting for the automatic overflow trigger. Keeps recent messages verbatim; earlier context collapses to the checkpoint summary. Waits (bounded) for an in-flight checkpoint writer first |
 | `/connect` | Sign in to a provider (e.g. OpenRouter) |
+| `/compose-next` | Recommended spec→ship feature delivery skill; hidden from model auto-discovery — invoke explicitly |
 | `/<skill-name>` | Invoke any available skill directly by name |
 
 ## Keybindings
